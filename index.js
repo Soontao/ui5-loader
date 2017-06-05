@@ -6,40 +6,33 @@ const loaderUtils = require("loader-utils");
 
 let loaderOptions = null;
 
-function ui5Loader(source, map)
-{
+function ui5Loader(source, map) {
     this.cacheable();
 
-    if (!source)
-    {
+    if (!source) {
         return this.callback(null, source, map);
     }
 
     loaderOptions = loaderUtils.parseQuery(this.query);
-    if (!loaderOptions.sourceRoot)
-    {
+    if (!loaderOptions.sourceRoot) {
         loaderOptions.sourceRoot = "./";
     }
     const webpackRemainingChain = loaderUtils.getRemainingRequest(this).split('!');
     const filename = webpackRemainingChain[webpackRemainingChain.length - 1];
 
-    let groups = source.match(/sap\.ui\.define\(["'].+]/);
-    if (groups && groups.length > 0)
-    {
+    let groups = source.match(/sap\.ui\.define\(.*?["'].+]/);
+    if (groups && groups.length > 0) {
         const definePart = groups[0];
-        if (!definePart.endsWith("[]"))
-        {
+        if (!definePart.endsWith("[]")) {
             groups = definePart.match(/\[(.+)\]/);
-            if (groups && groups.length > 0)
-            {
+            if (groups && groups.length > 0) {
                 const group = groups[1];
                 let dependencies = group.split(", ").map(d => d.replace(/["']/g, ""));
                 const requires = [];
 
                 dependencies = dependencies.map(d => {
                     const absPath = resolveModule(d, filename);
-                    if (absPath !== null)
-                    {
+                    if (absPath !== null) {
                         requires.push(`require("${absPath}");`);
                     }
                 });
@@ -52,28 +45,40 @@ function ui5Loader(source, map)
     this.callback(null, source, map);
 };
 
-function resolveModule(modulePath, sourceFilename)
-{
-    const sourceRoot = path.resolve(loaderOptions.sourceRoot ? loaderOptions.sourceRoot : process.cwd());
-    let absPath = path.resolve(sourceRoot, "./" + modulePath);
-    if (!absPath.endsWith(".js"))
-    {
+function resolveModule(modulePath, sourceFilename) {
+    const sourceRoot = path.dirname(sourceFilename);
+    let absPath = path.resolve(sourceRoot, modulePath);
+    try {
+        absPath = require.resolve(modulePath);
+
+    }
+    catch (e) {
+
+    }
+    finally {
+
+    }
+
+    try {
+        if (modulePath.startsWith('jquery') || modulePath.startsWith('sap-'))
+            absPath = require.resolve(`sap/${modulePath}`)
+    }
+    catch (e) {
+
+    }
+    if (!absPath.endsWith(".js")) {
         absPath += ".js";
     }
-    if (fs.existsSync(absPath))
-    {
+    if (fs.existsSync(absPath)) {
         let relativePath = path.relative(path.dirname(sourceFilename), absPath);
-        if (!relativePath.startsWith("."))
-        {
+        if (!relativePath.startsWith(".")) {
             relativePath = "./" + relativePath;
         }
         relativePath = relativePath.replace(/\\/g, "/");
         return relativePath;
     }
-    else
-    {
-        if (!modulePath.startsWith("sap/ui/base"))
-        {
+    else {
+        if (!modulePath.startsWith("sap/ui/base")) {
             console.warn(`WARN: Dependency "${modulePath}" of "${path.relative(sourceRoot, sourceFilename)}" is not found in ${sourceRoot}.`);
         }
         return null;
